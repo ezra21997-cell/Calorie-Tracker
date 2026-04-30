@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920">
+  <title>anorev-hero-bg</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: #000;
+    }
+
+    #stage {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+    }
+
+    /* Layer 0 — Mountain base */
+    #layer-mountain {
+      position: absolute;
+      inset: 0;
+      background: #1a1410;
+    }
+
+    #layer-mountain::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 70%;
+      background: linear-gradient(
+        to top,
+        #110e0b 0%,
+        #161210 30%,
+        transparent 100%
+      );
+    }
+
+    /* Layer 1 — City tiers */
+    #layer-tiers {
+      position: absolute;
+      inset: 0;
+    }
+
+    .tier {
+      position: absolute;
+      left: -2%;
+      width: 104%;
+      border-radius: 48% 48% 0 0 / 12px 12px 0 0;
+    }
+
+    .tier-upper {
+      bottom: 62%;
+      height: 90px;
+      background: linear-gradient(
+        to bottom,
+        rgba(176, 152, 112, 0.0) 0%,
+        rgba(176, 152, 112, 0.28) 60%,
+        rgba(160, 138, 100, 0.35) 100%
+      );
+      border-radius: 55% 55% 0 0 / 18px 18px 0 0;
+    }
+
+    .tier-mid {
+      bottom: 44%;
+      height: 110px;
+      background: linear-gradient(
+        to bottom,
+        rgba(184, 153, 106, 0.0) 0%,
+        rgba(184, 153, 106, 0.38) 50%,
+        rgba(168, 140, 95, 0.45) 100%
+      );
+      border-radius: 50% 50% 0 0 / 16px 16px 0 0;
+    }
+
+    .tier-lower {
+      bottom: 24%;
+      height: 130px;
+      background: linear-gradient(
+        to bottom,
+        rgba(200, 169, 122, 0.0) 0%,
+        rgba(200, 169, 122, 0.42) 40%,
+        rgba(184, 155, 108, 0.55) 100%
+      );
+      border-radius: 45% 45% 0 0 / 14px 14px 0 0;
+    }
+
+    .tier::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 18px,
+        rgba(0, 0, 0, 0.06) 18px,
+        rgba(0, 0, 0, 0.06) 19px
+      );
+    }
+
+    /* Layer 2 — Rain */
+    #layer-rain {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      transform: rotate(8deg) scale(1.15);
+      transform-origin: center center;
+    }
+
+    .raindrop {
+      position: absolute;
+      width: 1px;
+      background: rgba(200, 210, 220, 0.16);
+      border-radius: 0 0 1px 1px;
+      animation: fall linear infinite;
+    }
+
+    @keyframes fall {
+      0%   { transform: translateY(-140px); opacity: 0; }
+      5%   { opacity: 1; }
+      95%  { opacity: 1; }
+      100% { transform: translateY(1220px); opacity: 0; }
+    }
+
+    /* Layer 3 — Cloud / mist */
+    #layer-cloud {
+      position: absolute;
+      top: 22%;
+      left: -8%;
+      width: 116%;
+      height: 220px;
+      opacity: 0.82;
+      background: linear-gradient(
+        to bottom,
+        rgba(220, 225, 230, 0.0) 0%,
+        rgba(220, 225, 230, 0.18) 30%,
+        rgba(215, 220, 226, 0.22) 55%,
+        rgba(210, 216, 222, 0.08) 80%,
+        rgba(210, 216, 222, 0.0) 100%
+      );
+      filter: blur(28px);
+    }
+
+    /* Layer 4 — Vignette */
+    #layer-vignette {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        ellipse 90% 85% at 50% 50%,
+        transparent 38%,
+        rgba(10, 8, 6, 0.55) 68%,
+        rgba(8, 6, 4, 0.82) 100%
+      );
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="stage" data-composition-id="anorev-hero-bg" data-width="1920" data-height="1080" data-start="0" data-duration="14">
+    <div id="layer-mountain"></div>
+
+    <div id="layer-tiers">
+      <div class="tier tier-upper"></div>
+      <div class="tier tier-mid"></div>
+      <div class="tier tier-lower"></div>
+    </div>
+
+    <div id="layer-rain"></div>
+
+    <div id="layer-cloud"></div>
+
+    <div id="layer-vignette"></div>
+  </div>
+
+  <script>
+    const DURATION = 14;
+
+    // Seeded PRNG (mulberry32) — deterministic across all render frames
+    function mulberry32(seed) {
+      return function () {
+        seed |= 0;
+        seed = (seed + 0x6D2B79F5) | 0;
+        var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    const rand = mulberry32(0xA3F5C2D1);
+
+    // --- Rain generation ---
+    (function buildRain() {
+      const container = document.getElementById('layer-rain');
+      const count = 88;
+      for (let i = 0; i < count; i++) {
+        const drop = document.createElement('span');
+        drop.className = 'raindrop';
+
+        const x       = rand() * 2100 - 80;
+        const h       = 60 + rand() * 80;
+        const dur     = 0.62 + rand() * 0.46;
+        const delay   = -(rand() * dur);
+        const opacity = 0.10 + rand() * 0.14;
+
+        drop.style.cssText = [
+          `left: ${x.toFixed(1)}px`,
+          `height: ${h.toFixed(1)}px`,
+          `animation-duration: ${dur.toFixed(3)}s`,
+          `animation-delay: ${delay.toFixed(3)}s`,
+          `background: rgba(200,210,220,${opacity.toFixed(2)})`,
+        ].join(';');
+
+        container.appendChild(drop);
+      }
+    })();
+
+    // --- GSAP timeline (Hyperframes conventions) ---
+    const tl = gsap.timeline({ paused: true });
+
+    // Layer 1: city tiers — imperceptible slow downward drift
+    tl.to('[data-composition-id="anorev-hero-bg"] .tier', {
+      y: -6,
+      duration: DURATION,
+      ease: 'none',
+    }, 0);
+
+    // Layer 3: cloud — slow horizontal drift
+    tl.to('#layer-cloud', {
+      x: 32,
+      duration: DURATION,
+      ease: 'none',
+    }, 0);
+
+    // Layer 3: cloud — gentle opacity pulse (0.82 → 1.0 → 0.82, fits exactly in DURATION)
+    tl.fromTo('#layer-cloud',
+      { opacity: 0.82 },
+      {
+        opacity: 1.0,
+        duration: DURATION / 2,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: 1,
+      },
+    0);
+
+    // Pin timeline to exact loop length
+    tl.set({}, {}, DURATION);
+
+    // Register for Hyperframes renderer
+    window.__timelines = window.__timelines || {};
+    window.__timelines['anorev-hero-bg'] = tl;
+  </script>
+</body>
+</html>

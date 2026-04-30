@@ -1,0 +1,81 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Trend Scraper – full stack
+#
+#  Services:
+#    db        – PostgreSQL database
+#    api       – FastAPI web server  → http://localhost:8000
+#    scheduler – background data collector (runs every 15 min)
+#
+#  Usage:
+#    docker compose up          # start everything
+#    docker compose up -d       # start in background
+#    docker compose down        # stop everything
+#    docker compose logs -f     # watch live logs
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-trend_db}
+      POSTGRES_USER:     ${POSTGRES_USER:-trend_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trend_pass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trend_user} -d ${POSTGRES_DB:-trend_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"   # expose so you can inspect with pgAdmin if you want
+
+  # ── API server ──────────────────────────────────────────────────────────────
+  api:
+    build: .
+    restart: unless-stopped
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    environment:
+      DATABASE_URL:      postgresql+psycopg2://${POSTGRES_USER:-trend_user}:${POSTGRES_PASSWORD:-trend_pass}@db:5432/${POSTGRES_DB:-trend_db}
+      REDDIT_CLIENT_ID:      ${REDDIT_CLIENT_ID:-}
+      REDDIT_CLIENT_SECRET:  ${REDDIT_CLIENT_SECRET:-}
+      REDDIT_USER_AGENT:     ${REDDIT_USER_AGENT:-trend-scraper/1.0}
+      REDDIT_SUBREDDIT:      ${REDDIT_SUBREDDIT:-all}
+      GOOGLE_TRENDS_GEO:     ${GOOGLE_TRENDS_GEO:-US}
+      LOG_LEVEL:             ${LOG_LEVEL:-INFO}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Scheduler (data collector) ──────────────────────────────────────────────
+  scheduler:
+    build: .
+    restart: unless-stopped
+    command: python -m workers.scheduler
+    environment:
+      DATABASE_URL:               postgresql+psycopg2://${POSTGRES_USER:-trend_user}:${POSTGRES_PASSWORD:-trend_pass}@db:5432/${POSTGRES_DB:-trend_db}
+      REDDIT_CLIENT_ID:           ${REDDIT_CLIENT_ID:-}
+      REDDIT_CLIENT_SECRET:       ${REDDIT_CLIENT_SECRET:-}
+      REDDIT_USER_AGENT:          ${REDDIT_USER_AGENT:-trend-scraper/1.0}
+      REDDIT_SUBREDDIT:           ${REDDIT_SUBREDDIT:-all}
+      GOOGLE_TRENDS_GEO:          ${GOOGLE_TRENDS_GEO:-US}
+      SCHEDULER_INTERVAL_SECONDS: ${SCHEDULER_INTERVAL_SECONDS:-900}
+      LOG_LEVEL:                  ${LOG_LEVEL:-INFO}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
