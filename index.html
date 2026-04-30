@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#4CAF50">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Calories">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <title>Calorie Tracker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a1a; min-height: 100vh; }
+
+    nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: white; border-top: 1px solid #e0e0e0;
+      display: flex; z-index: 100;
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+    nav button {
+      flex: 1; padding: 10px 4px 14px; border: none; background: none;
+      font-size: 10px; color: #888; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+    }
+    nav button.active { color: #4CAF50; }
+    nav button svg { width: 22px; height: 22px; }
+
+    .view { display: none; padding: 16px 16px 90px; max-width: 480px; margin: 0 auto; }
+    .view.active { display: block; }
+
+    .page-header {
+      background: white; border-radius: 12px; padding: 16px;
+      margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.1);
+    }
+    .page-header h1 { font-size: 20px; font-weight: 700; }
+    .page-header .date { font-size: 13px; color: #666; margin-top: 2px; }
+
+    .goal-bar { margin-top: 12px; }
+    .goal-text { display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 6px; }
+    .goal-text .total { font-weight: 700; font-size: 15px; color: #1a1a1a; }
+    .progress-track { background: #e0e0e0; border-radius: 999px; height: 8px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 999px; background: #4CAF50; transition: width 0.3s; }
+    .progress-fill.over { background: #f44336; }
+
+    .meal-card {
+      background: white; border-radius: 12px; padding: 16px;
+      margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.1);
+    }
+    .meal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .meal-title { font-weight: 600; font-size: 16px; }
+    .meal-total { font-size: 13px; color: #666; font-weight: 500; }
+
+    .meal-inputs { display: flex; gap: 8px; }
+    .meal-inputs input[type="text"] {
+      flex: 1; padding: 10px 12px; border: 1px solid #e0e0e0;
+      border-radius: 8px; font-size: 14px; min-width: 0;
+    }
+    .meal-inputs input[type="number"] {
+      width: 76px; padding: 10px 8px; border: 1px solid #e0e0e0;
+      border-radius: 8px; font-size: 14px; flex-shrink: 0;
+    }
+    input:focus { outline: none; border-color: #4CAF50 !important; }
+
+    .snack-entry { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+    .snack-entry input[type="text"] {
+      flex: 1; padding: 10px 12px; border: 1px solid #e0e0e0;
+      border-radius: 8px; font-size: 14px; min-width: 0;
+    }
+    .snack-entry input[type="number"] {
+      width: 76px; padding: 10px 8px; border: 1px solid #e0e0e0;
+      border-radius: 8px; font-size: 14px; flex-shrink: 0;
+    }
+    .remove-btn {
+      background: none; border: none; color: #ccc;
+      font-size: 22px; cursor: pointer; padding: 2px 4px; line-height: 1; flex-shrink: 0;
+    }
+    .remove-btn:active { color: #f44336; }
+
+    .add-snack-btn {
+      width: 100%; padding: 10px; border: 1.5px dashed #ccc;
+      border-radius: 8px; background: none; color: #888;
+      font-size: 14px; cursor: pointer; margin-top: 4px;
+    }
+    .add-snack-btn:active { border-color: #4CAF50; color: #4CAF50; }
+
+    .save-btn {
+      width: 100%; padding: 14px; background: #4CAF50; color: white;
+      border: none; border-radius: 12px; font-size: 16px;
+      font-weight: 600; cursor: pointer; margin-top: 4px;
+    }
+    .save-btn:active { background: #388E3C; }
+
+    /* Calendar */
+    .cal-nav {
+      display: flex; justify-content: space-between; align-items: center;
+      background: white; border-radius: 12px; padding: 12px 16px;
+      margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.1);
+    }
+    .cal-nav h2 { font-size: 17px; font-weight: 600; }
+    .cal-nav button { background: none; border: none; font-size: 24px; cursor: pointer; color: #4CAF50; padding: 0 8px; }
+
+    .calendar-grid {
+      background: white; border-radius: 12px; padding: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.1); margin-bottom: 16px;
+    }
+    .day-names { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; margin-bottom: 6px; }
+    .day-names span { font-size: 11px; font-weight: 600; color: #888; padding: 4px 0; }
+    .cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .cal-day {
+      aspect-ratio: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      border-radius: 8px; font-size: 13px; cursor: pointer;
+      position: relative; border: 2px solid transparent;
+    }
+    .cal-day.empty { cursor: default; }
+    .cal-day.has-data { background: #e8f5e9; color: #2e7d32; font-weight: 600; }
+    .cal-day.today { border-color: #4CAF50; }
+    .cal-day.selected { background: #4CAF50 !important; color: white !important; }
+    .cal-dot {
+      width: 4px; height: 4px; background: #4CAF50;
+      border-radius: 50%; position: absolute; bottom: 3px;
+    }
+    .cal-day.selected .cal-dot { background: white; }
+    .cal-day.has-data.selected .cal-dot { display: none; }
+
+    .day-detail {
+      background: white; border-radius: 12px; padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.1);
+    }
+    .day-detail h3 { font-size: 15px; font-weight: 600; margin-bottom: 12px; color: #333; }
+    .detail-row {
+      display: flex; align-items: baseline; padding: 7px 0;
+      border-bottom: 1px solid #f0f0f0; font-size: 14px;
+    }
+    .detail-row:last-of-type { border-bottom: none; }
+    .detail-meal { color: #888; font-size: 12px; font-weight: 600; text-transform: uppercase; width: 72px; flex-shrink: 0; }
+    .detail-food { flex: 1; color: #333; padding: 0 8px; }
+    .detail-cal { font-weight: 600; color: #1a1a1a; white-space: nowrap; }
+    .detail-total-row { display: flex; justify-content: space-between; padding-top: 10px; margin-top: 4px; border-top: 2px solid #e0e0e0; font-weight: 700; font-size: 15px; }
+
+    /* Settings */
+    .card {
+      background: white; border-radius: 12px; padding: 16px;
+      margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.1);
+    }
+    .card label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #555; text-transform: uppercase; letter-spacing: .3px; }
+    .card input[type="number"], .card input[type="date"], .card input[type="month"], .card select {
+      width: 100%; padding: 12px; border: 1px solid #e0e0e0;
+      border-radius: 8px; font-size: 15px; background: white;
+    }
+    .card p { font-size: 13px; color: #888; margin-top: 8px; }
+
+    .export-btn {
+      width: 100%; padding: 14px; background: #2196F3; color: white;
+      border: none; border-radius: 12px; font-size: 16px;
+      font-weight: 600; cursor: pointer; margin-top: 4px;
+    }
+    .export-btn:active { background: #1565C0; }
+
+    .section-title { font-size: 12px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; padding-left: 4px; }
+
+    .toast {
+      position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%);
+      background: #333; color: white; padding: 10px 20px;
+      border-radius: 20px; font-size: 14px; opacity: 0;
+      transition: opacity .25s; pointer-events: none; z-index: 300; white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<!-- Today View -->
+<div id="view-today" class="view active">
+  <div class="page-header">
+    <h1 id="today-title">Today</h1>
+    <div class="date" id="today-date"></div>
+    <div class="goal-bar">
+      <div class="goal-text">
+        <span>Daily Total</span>
+        <span class="total"><span id="today-total">0</span> / <span id="today-goal-label">2000</span> cal</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-title">Breakfast</span>
+      <span class="meal-total" id="breakfast-total">0 cal</span>
+    </div>
+    <div class="meal-inputs">
+      <input type="text" id="breakfast-food" placeholder="Food description" oninput="updateTotals()">
+      <input type="number" id="breakfast-cal" placeholder="Cal" min="0" oninput="updateTotals()">
+    </div>
+  </div>
+
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-title">Lunch</span>
+      <span class="meal-total" id="lunch-total">0 cal</span>
+    </div>
+    <div class="meal-inputs">
+      <input type="text" id="lunch-food" placeholder="Food description" oninput="updateTotals()">
+      <input type="number" id="lunch-cal" placeholder="Cal" min="0" oninput="updateTotals()">
+    </div>
+  </div>
+
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-title">Dinner</span>
+      <span class="meal-total" id="dinner-total">0 cal</span>
+    </div>
+    <div class="meal-inputs">
+      <input type="text" id="dinner-food" placeholder="Food description" oninput="updateTotals()">
+      <input type="number" id="dinner-cal" placeholder="Cal" min="0" oninput="updateTotals()">
+    </div>
+  </div>
+
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-title">Snacks</span>
+      <span class="meal-total" id="snacks-total">0 cal</span>
+    </div>
+    <div id="snacks-list"></div>
+    <button class="add-snack-btn" onclick="addSnack()">+ Add Snack</button>
+  </div>
+
+  <button class="save-btn" onclick="saveDay()">Save</button>
+</div>
+
+<!-- Calendar View -->
+<div id="view-calendar" class="view">
+  <div class="cal-nav">
+    <button onclick="calPrev()">&#8249;</button>
+    <h2 id="cal-month-label"></h2>
+    <button onclick="calNext()">&#8250;</button>
+  </div>
+  <div class="calendar-grid">
+    <div class="day-names">
+      <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+    </div>
+    <div class="cal-days" id="cal-days"></div>
+  </div>
+  <div class="day-detail" id="day-detail" style="display:none"></div>
+</div>
+
+<!-- Settings View -->
+<div id="view-settings" class="view">
+  <p class="section-title">Goal</p>
+  <div class="card">
+    <label>Daily Calorie Goal</label>
+    <input type="number" id="goal-input" placeholder="e.g. 2000" min="100" max="20000">
+    <p>Used for the progress bar and CSV export column.</p>
+  </div>
+  <button class="save-btn" onclick="saveSettings()">Save Settings</button>
+</div>
+
+<!-- Export View -->
+<div id="view-export" class="view">
+  <p class="section-title">Export to CSV</p>
+  <div class="card">
+    <label>Period</label>
+    <select id="export-type" onchange="onExportTypeChange()">
+      <option value="week">Current Week (Sun–Sat)</option>
+      <option value="month">Current Month</option>
+      <option value="week-select">Pick a Week</option>
+      <option value="month-select">Pick a Month</option>
+    </select>
+  </div>
+  <div class="card" id="week-picker" style="display:none">
+    <label>Week Starting (Sunday)</label>
+    <input type="date" id="week-start-input">
+  </div>
+  <div class="card" id="month-picker" style="display:none">
+    <label>Month</label>
+    <input type="month" id="month-input">
+  </div>
+  <button class="export-btn" onclick="exportCSV()">Download CSV</button>
+</div>
+
+<!-- Bottom Nav -->
+<nav>
+  <button class="active" id="nav-today" onclick="showView('today')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    Today
+  </button>
+  <button id="nav-calendar" onclick="showView('calendar')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    Calendar
+  </button>
+  <button id="nav-settings" onclick="showView('settings')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
+    Settings
+  </button>
+  <button id="nav-export" onclick="showView('export')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export
+  </button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Storage helpers ──────────────────────────────────────────────────────
+const STORE = 'ct_data_v1';
+const GOAL_KEY = 'ct_goal_v1';
+
+function getData() {
+  try { return JSON.parse(localStorage.getItem(STORE)) || {}; }
+  catch { return {}; }
+}
+function saveData(d) { localStorage.setItem(STORE, JSON.stringify(d)); }
+function getGoal() { return parseInt(localStorage.getItem(GOAL_KEY)) || 2000; }
+function setGoal(g) { localStorage.setItem(GOAL_KEY, String(g)); }
+
+// ── Date helpers ─────────────────────────────────────────────────────────
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function pad(n) { return String(n).padStart(2, '0'); }
+function dateLabel(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+}
+
+// ── Navigation ───────────────────────────────────────────────────────────
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'today') initTodayView(editingDate);
+  if (name === 'calendar') renderCalendar();
+  if (name === 'settings') loadSettings();
+  if (name === 'export') initExport();
+}
+
+// ── Today / Edit view ────────────────────────────────────────────────────
+let editingDate = todayStr();
+let snackCounter = 0;
+
+function initTodayView(dateStr) {
+  editingDate = dateStr;
+  const isToday = dateStr === todayStr();
+  document.getElementById('today-title').textContent = isToday ? 'Today' : 'Editing Day';
+  document.getElementById('today-date').textContent = dateLabel(dateStr);
+  document.getElementById('today-goal-label').textContent = getGoal();
+  populateForm(dateStr);
+}
+
+function populateForm(dateStr) {
+  const data = getData();
+  const day = data[dateStr] || { breakfast:{food:'',cal:0}, lunch:{food:'',cal:0}, dinner:{food:'',cal:0}, snacks:[] };
+
+  document.getElementById('breakfast-food').value = day.breakfast?.food || '';
+  document.getElementById('breakfast-cal').value  = day.breakfast?.cal  || '';
+  document.getElementById('lunch-food').value     = day.lunch?.food     || '';
+  document.getElementById('lunch-cal').value      = day.lunch?.cal      || '';
+  document.getElementById('dinner-food').value    = day.dinner?.food    || '';
+  document.getElementById('dinner-cal').value     = day.dinner?.cal     || '';
+
+  const list = document.getElementById('snacks-list');
+  list.innerHTML = '';
+  snackCounter = 0;
+  const snacks = day.snacks && day.snacks.length ? day.snacks : [];
+  snacks.forEach(s => addSnack(s.food, s.cal));
+
+  updateTotals();
+}
+
+function addSnack(food = '', cal = '') {
+  snackCounter++;
+  const id = 'snack-' + snackCounter;
+  const div = document.createElement('div');
+  div.className = 'snack-entry';
+  div.id = id;
+  div.innerHTML =
+    `<input type="text" placeholder="Snack description" value="${esc(food)}" oninput="updateTotals()">` +
+    `<input type="number" placeholder="Cal" min="0" value="${cal || ''}" oninput="updateTotals()">` +
+    `<button class="remove-btn" onclick="removeSnack('${id}')">&#x2715;</button>`;
+  document.getElementById('snacks-list').appendChild(div);
+  updateTotals();
+}
+
+function removeSnack(id) {
+  document.getElementById(id)?.remove();
+  updateTotals();
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+    .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function updateTotals() {
+  const bCal = intVal('breakfast-cal');
+  const lCal = intVal('lunch-cal');
+  const dCal = intVal('dinner-cal');
+  let sCal = 0;
+  document.querySelectorAll('#snacks-list input[type="number"]').forEach(i => { sCal += parseInt(i.value) || 0; });
+
+  const total = bCal + lCal + dCal + sCal;
+  const goal = getGoal();
+
+  document.getElementById('breakfast-total').textContent = bCal + ' cal';
+  document.getElementById('lunch-total').textContent     = lCal + ' cal';
+  document.getElementById('dinner-total').textContent    = dCal + ' cal';
+  document.getElementById('snacks-total').textContent    = sCal + ' cal';
+  document.getElementById('today-total').textContent     = total;
+  document.getElementById('today-goal-label').textContent = goal;
+
+  const pct = goal > 0 ? Math.min(total / goal * 100, 100) : 0;
+  const fill = document.getElementById('progress-fill');
+  fill.style.width = pct + '%';
+  fill.classList.toggle('over', total > goal);
+}
+
+function intVal(id) { return parseInt(document.getElementById(id).value) || 0; }
+
+function collectSnacks() {
+  const snacks = [];
+  document.querySelectorAll('#snacks-list .snack-entry').forEach(row => {
+    const food = row.querySelector('input[type="text"]').value.trim();
+    const cal  = parseInt(row.querySelector('input[type="number"]').value) || 0;
+    if (food || cal) snacks.push({ food, cal });
+  });
+  return snacks;
+}
+
+function saveDay() {
+  const data = getData();
+  data[editingDate] = {
+    breakfast: { food: document.getElementById('breakfast-food').value.trim(), cal: intVal('breakfast-cal') },
+    lunch:     { food: document.getElementById('lunch-food').value.trim(),     cal: intVal('lunch-cal') },
+    dinner:    { food: document.getElementById('dinner-food').value.trim(),     cal: intVal('dinner-cal') },
+    snacks:    collectSnacks(),
+  };
+  saveData(data);
+  showToast('Saved!');
+}
+
+// ── Calendar ─────────────────────────────────────────────────────────────
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+let calYear, calMonth;
+(function() { const d = new Date(); calYear = d.getFullYear(); calMonth = d.getMonth(); })();
+
+function renderCalendar() {
+  document.getElementById('cal-month-label').textContent = `${MONTHS[calMonth]} ${calYear}`;
+  const grid = document.getElementById('cal-days');
+  grid.innerHTML = '';
+  const data = getData();
+  const today = todayStr();
+
+  const firstDow = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+  for (let i = 0; i < firstDow; i++) {
+    const blank = document.createElement('div');
+    blank.className = 'cal-day empty';
+    grid.appendChild(blank);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${calYear}-${pad(calMonth+1)}-${pad(d)}`;
+    const el = document.createElement('div');
+    el.className = 'cal-day';
+    el.textContent = d;
+    if (data[ds]) {
+      el.classList.add('has-data');
+      const dot = document.createElement('div');
+      dot.className = 'cal-dot';
+      el.appendChild(dot);
+    }
+    if (ds === today) el.classList.add('today');
+    el.addEventListener('click', () => onCalDayClick(ds, el));
+    grid.appendChild(el);
+  }
+  document.getElementById('day-detail').style.display = 'none';
+}
+
+function onCalDayClick(ds, el) {
+  document.querySelectorAll('.cal-day.selected').forEach(d => d.classList.remove('selected'));
+  el.classList.add('selected');
+  renderDayDetail(ds);
+}
+
+function renderDayDetail(ds) {
+  const data = getData();
+  const day  = data[ds];
+  const detail = document.getElementById('day-detail');
+  const lbl = dateLabel(ds);
+
+  if (!day) {
+    detail.innerHTML =
+      `<h3>${lbl}</h3>` +
+      `<p style="color:#888;font-size:14px;padding:8px 0">No data logged for this day.</p>` +
+      `<button class="save-btn" style="margin-top:8px" onclick="goEditDay('${ds}')">Add Entry</button>`;
+    detail.style.display = 'block';
+    return;
+  }
+
+  let html = `<h3>${lbl}</h3>`;
+  let total = 0;
+
+  function row(meal, food, cal) {
+    if (!food && !cal) return '';
+    total += cal || 0;
+    return `<div class="detail-row">
+      <span class="detail-meal">${meal}</span>
+      <span class="detail-food">${esc(food || '—')}</span>
+      <span class="detail-cal">${cal || 0}</span>
+    </div>`;
+  }
+
+  html += row('Breakfast', day.breakfast?.food, day.breakfast?.cal);
+  html += row('Lunch',     day.lunch?.food,     day.lunch?.cal);
+  html += row('Dinner',    day.dinner?.food,     day.dinner?.cal);
+
+  (day.snacks || []).forEach((s, i) => {
+    total += s.cal || 0;
+    html += `<div class="detail-row">
+      <span class="detail-meal">${i === 0 ? 'Snack' : ''}</span>
+      <span class="detail-food">${esc(s.food || '—')}</span>
+      <span class="detail-cal">${s.cal || 0}</span>
+    </div>`;
+  });
+
+  const goal = getGoal();
+  const color = total > goal ? '#f44336' : '#4CAF50';
+  html += `<div class="detail-total-row"><span>Total</span><span style="color:${color}">${total} / ${goal} cal</span></div>`;
+  html += `<button class="save-btn" style="margin-top:14px" onclick="goEditDay('${ds}')">Edit This Day</button>`;
+
+  detail.innerHTML = html;
+  detail.style.display = 'block';
+}
+
+function goEditDay(ds) {
+  editingDate = ds;
+  showView('today');
+}
+
+function calPrev() { if (--calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); }
+function calNext() { if (++calMonth > 11) { calMonth = 0; calYear++; } renderCalendar(); }
+
+// ── Settings ─────────────────────────────────────────────────────────────
+function loadSettings() {
+  document.getElementById('goal-input').value = getGoal();
+}
+function saveSettings() {
+  const g = parseInt(document.getElementById('goal-input').value);
+  if (g >= 100) { setGoal(g); showToast('Goal saved!'); }
+  else showToast('Enter a valid goal (≥ 100)');
+}
+
+// ── Export ───────────────────────────────────────────────────────────────
+function initExport() {
+  const now = new Date();
+  document.getElementById('month-input').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}`;
+  const sun = new Date(now);
+  sun.setDate(now.getDate() - now.getDay());
+  document.getElementById('week-start-input').value = `${sun.getFullYear()}-${pad(sun.getMonth()+1)}-${pad(sun.getDate())}`;
+  onExportTypeChange();
+}
+
+function onExportTypeChange() {
+  const type = document.getElementById('export-type').value;
+  document.getElementById('week-picker').style.display  = type === 'week-select'  ? '' : 'none';
+  document.getElementById('month-picker').style.display = type === 'month-select' ? '' : 'none';
+}
+
+function buildDateRange() {
+  const type = document.getElementById('export-type').value;
+  const now  = new Date();
+  let start, end;
+  if (type === 'week') {
+    start = new Date(now); start.setDate(now.getDate() - now.getDay());
+    end   = new Date(start); end.setDate(start.getDate() + 6);
+  } else if (type === 'month') {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  } else if (type === 'week-select') {
+    start = new Date(document.getElementById('week-start-input').value + 'T00:00:00');
+    end   = new Date(start); end.setDate(start.getDate() + 6);
+  } else {
+    const [y, m] = document.getElementById('month-input').value.split('-').map(Number);
+    start = new Date(y, m - 1, 1);
+    end   = new Date(y, m, 0);
+  }
+  const dates = [];
+  const cur = new Date(start);
+  while (cur <= end) {
+    dates.push(`${cur.getFullYear()}-${pad(cur.getMonth()+1)}-${pad(cur.getDate())}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return { dates, start, end };
+}
+
+function exportCSV() {
+  const { dates, start, end } = buildDateRange();
+  const data = getData();
+  const goal = getGoal();
+
+  const rows = [['Date', 'Meal', 'Food Description', 'Calories', 'Daily Total', 'Daily Goal']];
+
+  dates.forEach(ds => {
+    const day = data[ds];
+    if (!day) return;
+
+    const total =
+      (day.breakfast?.cal || 0) +
+      (day.lunch?.cal     || 0) +
+      (day.dinner?.cal    || 0) +
+      (day.snacks || []).reduce((s, x) => s + (x.cal || 0), 0);
+
+    function push(meal, food, cal) {
+      rows.push([ds, meal, food, cal, total, goal]);
+    }
+
+    if (day.breakfast?.food || day.breakfast?.cal) push('Breakfast', day.breakfast.food || '', day.breakfast.cal || 0);
+    if (day.lunch?.food     || day.lunch?.cal)     push('Lunch',     day.lunch.food     || '', day.lunch.cal     || 0);
+    if (day.dinner?.food    || day.dinner?.cal)    push('Dinner',    day.dinner.food    || '', day.dinner.cal    || 0);
+    (day.snacks || []).forEach(s => push('Snack', s.food || '', s.cal || 0));
+  });
+
+  if (rows.length === 1) { showToast('No data in this period'); return; }
+
+  const csv = rows.map(r =>
+    r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')
+  ).join('\r\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const s = `${start.getFullYear()}-${pad(start.getMonth()+1)}-${pad(start.getDate())}`;
+  const e = `${end.getFullYear()}-${pad(end.getMonth()+1)}-${pad(end.getDate())}`;
+  a.download = `calories_${s}_to_${e}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  showToast('CSV downloaded!');
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+editingDate = todayStr();
+initTodayView(editingDate);
+</script>
+</body>
+</html>
